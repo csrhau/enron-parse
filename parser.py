@@ -5,11 +5,10 @@
 from collections import namedtuple
 import argparse
 import codecs
-import dateutil.parser
-import datetime
-import email.parser
 import json
 import os
+import email.parser
+import dateutil.parser
 
 Message = namedtuple('Message', ['id', 'sender', 'recipients', 'timestamp', 'subject', 'body'])
 
@@ -43,7 +42,7 @@ def read_message(path):
 def load_messages(path, verbose):
     """ Loads messages from the corpus and returns them as Message objects """
     messages = []
-    for root, dirs, files in os.walk(path):
+    for root, _, files in os.walk(path):
         if verbose:
             print("Processing {}".format(root))
         for message_file in files:
