@@ -7,6 +7,7 @@ import argparse
 import codecs
 import json
 import os
+import operator
 import email.parser
 import dateutil.parser
 
@@ -41,31 +42,23 @@ def read_message(path):
                        message['Subject'],
                        message.get_payload())
 
-def load_messages(path, verbose):
+def load_messages(path, unique, verbose):
     """ Loads messages from the corpus and returns them as Message objects """
     messages = []
+    signatures = set()
     for root, _, files in os.walk(path):
         if verbose:
             print("Processing {}".format(root))
         for message_file in files:
-            messages.append(read_message(os.path.join(root, message_file)))
+            message = read_message(os.path.join(root, message_file))
+            if unique:
+                sig = (message.sender, message.recipients, message.timestamp,
+                       message.subject, message.body)
+                if sig in signatures:
+                    continue
+                signatures.add(sig)
+            messages.append(message)
     return messages
-
-def unique_messages(messages, verbose):
-    """ Removes duplicate messages where all fields except ID are shared """
-    uniques = []
-    signatures = set()
-    duplicates = 0
-    for message in messages:
-        sig = (message.sender, message.recipients, message.timestamp, message.subject, message.body)
-        if sig not in signatures:
-            signatures.add(sig)
-            uniques.append(message)
-        else:
-            duplicates += 1
-    if verbose:
-        print("Removed {} duplicates from {} messages".format(duplicates, len(messages)))
-    return uniques
 
 def output_messages(path, messages):
     """ Serializes messages to JSON """
@@ -78,10 +71,8 @@ def output_messages(path, messages):
 def main():
     """ Applicaion entry point """
     args = process_arguments()
-    messages = load_messages(args.path, args.verbose)
-    if args.unique:
-        messages = unique_messages(messages, args.verbose)
-    messages.sort(key=lambda m: m.timestamp)
+    messages = load_messages(args.path, args.unique, args.verbose)
+    messages.sort(key=operator.attrgetter('timestamp'))
     output_messages(args.output, messages)
 
 if __name__ == '__main__':
