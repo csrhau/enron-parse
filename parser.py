@@ -52,6 +52,7 @@ def load_messages(path, verbose):
     return messages
 
 def unique_messages(messages, verbose):
+    """ Removes duplicate messages where all fields except ID are shared """
     uniques = []
     signatures = set()
     duplicates = 0
@@ -60,7 +61,7 @@ def unique_messages(messages, verbose):
         if sig not in signatures:
             signatures.add(sig)
             uniques.append(message)
-        else: 
+        else:
             duplicates += 1
     if verbose:
         print("Removed {} duplicates from {} messages".format(duplicates, len(messages)))
