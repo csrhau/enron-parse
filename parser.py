@@ -11,7 +11,7 @@ import operator
 import email.parser
 import dateutil.parser
 
-Message = namedtuple('Message', ['id', 'sender', 'recipients', 'timestamp', 'subject', 'body'])
+Message = namedtuple('Message', ['sender', 'recipients', 'timestamp', 'subject', 'body'])
 
 def process_arguments():
     """ Process command line arguments """
@@ -35,8 +35,7 @@ def read_message(path):
         recipients = ()
         if message['To'] is not None:
             recipients = tuple(m.strip(',') for m in message['To'].split())
-        return Message(message['Message-ID'],
-                       message['From'],
+        return Message(message['From'],
                        recipients,
                        dateutil.parser.parse(message['Date']),
                        message['Subject'],
@@ -44,20 +43,21 @@ def read_message(path):
 
 def load_messages(path, unique, verbose):
     """ Loads messages from the corpus and returns them as Message objects """
-    messages = []
-    signatures = set()
+    if unique:
+        messages = set()
+    else:
+        messages = list()
     for root, _, files in os.walk(path):
         if verbose:
             print("Processing {}".format(root))
         for message_file in files:
             message = read_message(os.path.join(root, message_file))
             if unique:
-                sig = (message.sender, message.recipients, message.timestamp,
-                       message.subject, message.body)
-                if sig in signatures:
-                    continue
-                signatures.add(sig)
-            messages.append(message)
+                messages.add(message)
+            else:
+                messages.append(message)
+    if unique:
+        messages = list(messages)
     return messages
 
 def output_messages(path, messages):
