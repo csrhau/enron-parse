@@ -19,6 +19,8 @@ def process_arguments():
                         required=True)
     parser.add_argument("-o", "--output", help='Path to output file',
                         required=True)
+    parser.add_argument("-u", "--unique", help="Remove Duplicate messages",
+                        action="store_true")
     parser.add_argument("-v", "--verbose", help="increase output verbosity",
                         action="store_true")
     return parser.parse_args()
@@ -29,9 +31,9 @@ def read_message(path):
     with codecs.open(path, 'r', 'Latin-1') as message_file:
         content = message_file.read()
         message = parser.parsestr(content)
-        recipients = []
+        recipients = ()
         if message['To'] is not None:
-            recipients = [m.strip(',') for m in message['To'].split()]
+            recipients = tuple(m.strip(',') for m in message['To'].split())
         return Message(message['Message-ID'],
                        message['From'],
                        recipients,
@@ -49,6 +51,21 @@ def load_messages(path, verbose):
             messages.append(read_message(os.path.join(root, message_file)))
     return messages
 
+def unique_messages(messages, verbose):
+    uniques = []
+    signatures = set()
+    duplicates = 0
+    for message in messages:
+        sig = (message.sender, message.recipients, message.timestamp, message.subject, message.body)
+        if sig not in signatures:
+            signatures.add(sig)
+            uniques.append(message)
+        else: 
+            duplicates += 1
+    if verbose:
+        print("Removed {} duplicates from {} messages".format(duplicates, len(messages)))
+    return uniques
+
 def output_messages(path, messages):
     """ Serializes messages to JSON """
     data = [message._asdict() for message in messages]
@@ -61,6 +78,8 @@ def main():
     """ Applicaion entry point """
     args = process_arguments()
     messages = load_messages(args.path, args.verbose)
+    if args.unique:
+        messages = unique_messages(messages, args.verbose)
     messages.sort(key=lambda m: m.timestamp)
     output_messages(args.output, messages)
 
