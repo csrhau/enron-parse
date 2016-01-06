@@ -45,17 +45,16 @@ def load_messages(path, unique, verbose):
     """ Loads messages from the corpus and returns them as Message objects """
     if unique:
         messages = set()
+        ingest_method = messages.add
     else:
         messages = list()
+        ingest_method = messages.append
     for root, _, files in os.walk(path):
         if verbose:
             print("Processing {}".format(root))
         for message_file in files:
             message = read_message(os.path.join(root, message_file))
-            if unique:
-                messages.add(message)
-            else:
-                messages.append(message)
+            ingest_method(message)
     if unique:
         messages = list(messages)
     return messages
