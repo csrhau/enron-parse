@@ -21,6 +21,8 @@ def process_arguments():
                         required=True)
     parser.add_argument("-o", "--output", help='Path to output file',
                         required=True)
+    parser.add_argument("-s", "--sent", help='Only parse sent message folders',
+                        action="store_true")
     parser.add_argument("-u", "--unique", help="Remove Duplicate messages",
                         action="store_true")
     parser.add_argument("-i", "--internal", help="Remove external messages",
@@ -53,7 +55,7 @@ def is_internal(message):
         return False
     return all(r for r in message.recipients if enron_re.search(r))
 
-def load_messages(path, unique, internal, verbose):
+def load_messages(path, sent, unique, internal, verbose):
     """ Loads messages from the corpus and returns them as Message objects """
     if unique:
         uniques = set()
@@ -61,7 +63,10 @@ def load_messages(path, unique, internal, verbose):
     else:
         messages = list()
         ingest_method = messages.append
+    outbox_re = [re.compile(r) for r in ['sent_items$', 'sent$', 'sent_mail$']]
     for root, _, files in os.walk(path):
+        if sent and not any(re.search(root) for re in outbox_re):
+            continue
         if verbose:
             print("Processing {}".format(root))
         for message_file in files:
@@ -85,7 +90,7 @@ def output_messages(path, messages):
 def main():
     """ Applicaion entry point """
     args = process_arguments()
-    messages = load_messages(args.path, args.unique, args.internal, args.verbose)
+    messages = load_messages(args.path, args.sent, args.unique, args.internal, args.verbose)
     messages.sort(key=operator.attrgetter('timestamp'))
     output_messages(args.output, messages)
 
