@@ -66,7 +66,7 @@ def save_messages(messages, outfile):
 def main():
     """ Applicaion entry point """
     args = process_arguments()
-    address_book = {email: name for name, emails in json.load(args.aliases).items() 
+    address_book = {email: name for name, emails in json.load(args.aliases).items()\
                                 for email in emails}
     args.aliases.close()
     # Set ensures messages are unique
