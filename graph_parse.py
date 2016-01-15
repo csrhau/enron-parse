@@ -16,7 +16,7 @@ Message = namedtuple('Message', ['sender', 'recipients', 'timestamp'])
 def process_arguments():
     """ Process command line arguments """
     parser = argparse.ArgumentParser(description="Enron Corpus Parser")
-    parser.add_argument("-a", "--aliases", help='path to Alias file',
+    parser.add_argument("-w", "--whitelist", help='path to e-mail whitelist',
                         type=argparse.FileType('r'), required=True)
     parser.add_argument("-o", "--output", help='path to output file',
                         type=argparse.FileType('w'), required=True)
@@ -28,8 +28,10 @@ def process_arguments():
                         action="store_true")
     return parser.parse_args()
 
-def message_extractor(path, address_book, outboxes, verbose):
+def extract_messages(path, whitelist, outboxes, verbose):
     """ Extracts e-mails from the Enron corpus """
+    # Set ensures messages are unique
+    messages = set()
     parser = email.parser.Parser()
     outbox_re = [re.compile(r) for r in ['sent_items$', 'sent$', 'sent_mail$']]
     for root, _, files in os.walk(path):
@@ -41,20 +43,24 @@ def message_extractor(path, address_book, outboxes, verbose):
         for message_file in files:
             path = os.path.join(root, message_file)
             with codecs.open(path, 'r', 'Latin-1') as message_file:
-                content = message_file.read()
-                message = parser.parsestr(content)
+                message = parser.parsestr(message_file.read())
                 # Resolve senders and recipients
                 sender = message['From']
-                if sender not in address_book:
+                if sender not in whitelist:
                     continue
-                sender = address_book[sender]
-                if message['To'] is None:
+                recipients = []
+                if message['To'] is not None:
+                    recipients += [m.strip(',') for m in message['To'].split()]
+                if message['Cc'] is not None:
+                    recipients += [m.strip(',') for m in message['Cc'].split()]
+                if message['Bcc'] is not None:
+                    recipients += [m.strip(',') for m in message['Bcc'].split()]
+                # Only include recipients in whitelist
+                wl_recipients = tuple(r for r in recipients if r in whitelist)
+                if len(wl_recipients) == 0:
                     continue
-                recipients = [m.strip(',') for m in message['To'].split()]
-                recipients = tuple(address_book[r] for r in recipients if r in address_book)
-                if len(recipients) == 0:
-                    continue
-                yield Message(sender, recipients, dateutil.parser.parse(message['Date']))
+                messages.add(Message(sender, wl_recipients, dateutil.parser.parse(message['Date'])))
+    return sorted(messages, key=lambda x: x.timestamp)
 
 def save_messages(messages, outfile):
     """ Serializes messages to JSON """
@@ -66,11 +72,10 @@ def save_messages(messages, outfile):
 def main():
     """ Applicaion entry point """
     args = process_arguments()
-    address_book = {email: name for name, emails in json.load(args.aliases).items()\
-                                for email in emails}
-    args.aliases.close()
-    # Set ensures messages are unique
-    messages = set(message_extractor(args.path, address_book, args.sent, args.verbose))
+    whitelist = set(json.load(args.whitelist))
+    args.whitelist.close()
+
+    messages = extract_messages(args.path, whitelist, args.sent, args.verbose)
     save_messages(messages, args.output)
 
 if __name__ == '__main__':
